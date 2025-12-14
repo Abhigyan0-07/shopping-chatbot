@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛒 Shopping Assistant Chatbot</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <div class="header-content">
+                <div class="bot-avatar">🛒</div>
+                <div class="header-text">
+                    <h1>Shopping Assistant</h1>
+                    <p class="status">Online</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="chatbox" class="chatbox">
+            <div class="welcome-message">
+                <div class="bot-message">
+                    <div class="message-avatar">🤖</div>
+                    <div class="message-content">
+                        <p>Hi! Type <strong>"hey"</strong> to get started!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-container">
+            <input 
+                id="inputBox" 
+                type="text" 
+                placeholder="Type 'hey' to start..." 
+                autocomplete="off"
+            />
+            <button id="sendBtn" onclick="sendMessage()" aria-label="Send message">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { sendMessageToBot, fetchOrdersByEmail, fetchOrderById, performOrderAction, getContext } from "./chat.js";
+
+        const chatbox = document.getElementById("chatbox");
+        const input = document.getElementById("inputBox");
+        const sendBtn = document.getElementById("sendBtn");
+
+        // Remove welcome message helper
+        function removeWelcomeMessage() {
+            const welcomeMsg = chatbox.querySelector(".welcome-message");
+            if (welcomeMsg) {
+                welcomeMsg.remove();
+            }
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement("div");
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Format bot message (preserve newlines)
+        function formatBotMessage(text) {
+            let formatted = escapeHtml(text);
+            formatted = formatted.replace(/\n/g, "<br>");
+            return formatted;
+        }
+
+        // Append user message
+        function appendUserMessage(text) {
+            removeWelcomeMessage();
+            const messageDiv = document.createElement("div");
+            messageDiv.className = "message user-message";
+            messageDiv.innerHTML = `
+                <div class="message-content user-content">
+                    <p>${escapeHtml(text)}</p>
+                </div>
+                <div class="message-avatar user-avatar">👤</div>
+            `;
+            chatbox.appendChild(messageDiv);
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+
+        // Append bot message with optional options/orders
+        function appendBotMessage(data) {
+            removeWelcomeMessage();
+            const messageDiv = document.createElement("div");
+            messageDiv.className = "message bot-message";
+            
+            let content = `<div class="message-avatar bot-avatar-msg">🤖</div>`;
+            content += `<div class="message-content bot-content">`;
+            content += `<p>${formatBotMessage(data.reply)}</p>`;
+            
+            // Add options buttons if present
+            if (data.options && data.options.length > 0) {
+                content += `<div class="options-container">`;
+                data.options.forEach(option => {
+                    content += `<button class="option-btn" onclick="handleOptionClick('${escapeHtml(option)}')">${escapeHtml(option)}</button>`;
+                });
+                content += `</div>`;
+            }
+            
+            // Add orders list if present
+            if (data.orders && data.orders.length > 0) {
+                content += `<div class="orders-container">`;
+                data.orders.forEach(order => {
+                    const statusClass = getStatusClass(order.status);
+                    content += `<div class="order-card">`;
+                    content += `<div class="order-header">`;
+                    content += `<span class="order-id">Order #${order.orderId}</span>`;
+                    content += `<span class="order-status ${statusClass}">${order.status}</span>`;
+                    content += `</div>`;
+                    content += `<div class="order-items">`;
+                    order.items.forEach(item => {
+                        content += `<div class="order-item">${item.productName} (Qty: ${item.quantity}) - ₹${item.price}</div>`;
+                    });
+                    content += `</div>`;
+                    content += `<div class="order-footer">`;
+                    content += `<span class="order-amount">Total: ₹${order.totalAmount}</span>`;
+                    content += `<span class="order-date">${new Date(order.orderDate).toLocaleDateString()}</span>`;
+                    content += `</div>`;
+                    content += `<div class="order-actions">`;
+                    if (order.status !== "Delivered" && order.status !== "Refund" && order.status !== "Return" && order.status !== "Exchange") {
+                        content += `<button class="action-btn" onclick="handleOrderAction('${order.orderId}', 'track')">Track Order</button>`;
+                    }
+                    if (order.status === "Delivered" || order.status === "Processing") {
+                        content += `<button class="action-btn" onclick="handleOrderAction('${order.orderId}', 'return')">Request Return</button>`;
+                        content += `<button class="action-btn" onclick="handleOrderAction('${order.orderId}', 'exchange')">Request Exchange</button>`;
+                    }
+                    if (order.status === "Delivered" || order.status === "Processing" || order.status === "Processing") {
+                        content += `<button class="action-btn refund-btn" onclick="handleOrderAction('${order.orderId}', 'refund')">Get Refund Status</button>`;
+                    }
+                    content += `</div>`;
+                    content += `</div>`;
+                });
+                content += `</div>`;
+            }
+            
+            // Add single order details if present
+            if (data.order) {
+                const order = data.order;
+                const statusClass = getStatusClass(order.status);
+                content += `<div class="order-card detailed">`;
+                content += `<div class="order-header">`;
+                content += `<span class="order-id">Order #${order.orderId}</span>`;
+                content += `<span class="order-status ${statusClass}">${order.status}</span>`;
+                content += `</div>`;
+                content += `<div class="order-items">`;
+                order.items.forEach(item => {
+                    content += `<div class="order-item">${item.productName} (Qty: ${item.quantity}) - ₹${item.price}</div>`;
+                });
+                content += `</div>`;
+                content += `<div class="order-footer">`;
+                content += `<span class="order-amount">Total: ₹${order.totalAmount}</span>`;
+                content += `<span class="order-date">${new Date(order.orderDate).toLocaleDateString()}</span>`;
+                content += `</div>`;
+                if (order.trackingNumber) {
+                    content += `<div class="order-tracking">Tracking: ${order.trackingNumber}</div>`;
+                }
+                content += `<div class="order-actions">`;
+                if (order.status !== "Delivered" && order.status !== "Refund" && order.status !== "Return" && order.status !== "Exchange") {
+                    content += `<button class="action-btn" onclick="handleOrderAction('${order.orderId}', 'track')">Track Order</button>`;
+                }
+                if (order.status === "Delivered" || order.status === "Processing") {
+                    content += `<button class="action-btn" onclick="handleOrderAction('${order.orderId}', 'return')">Request Return</button>`;
+                    content += `<button class="action-btn" onclick="handleOrderAction('${order.orderId}', 'exchange')">Request Exchange</button>`;
+                }
+                if (order.status === "Delivered" || order.status === "Processing") {
+                    content += `<button class="action-btn refund-btn" onclick="handleOrderAction('${order.orderId}', 'refund')">Get Refund Status</button>`;
+                }
+                content += `</div>`;
+                content += `</div>`;
+            }
+            
+            content += `</div>`;
+            
+            messageDiv.innerHTML = content;
+            chatbox.appendChild(messageDiv);
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+
+        // Get status CSS class
+        function getStatusClass(status) {
+            const statusLower = status.toLowerCase();
+            if (statusLower === "delivered") return "status-green";
+            if (statusLower === "processing") return "status-orange";
+            if (statusLower === "refund" || statusLower === "return" || statusLower === "exchange") return "status-red";
+            return "status-gray";
+        }
+
+        // Show typing indicator
+        function showTypingIndicator() {
+            const typingIndicator = document.createElement("div");
+            typingIndicator.className = "message bot-message typing-indicator";
+            typingIndicator.id = "typing-indicator";
+            typingIndicator.innerHTML = `
+                <div class="message-avatar bot-avatar-msg">🤖</div>
+                <div class="message-content bot-content">
+                    <div class="typing-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            `;
+            chatbox.appendChild(typingIndicator);
+            chatbox.scrollTop = chatbox.scrollHeight;
+            return typingIndicator;
+        }
+
+        // Remove typing indicator
+        function removeTypingIndicator() {
+            const indicator = document.getElementById("typing-indicator");
+            if (indicator) {
+                indicator.remove();
+            }
+        }
+
+        // Handle option button click
+        window.handleOptionClick = function(option) {
+            input.value = option;
+            sendMessage();
+        };
+
+        // Handle order action button click
+        window.handleOrderAction = async function(orderId, action) {
+            showTypingIndicator();
+            
+            try {
+                const result = await performOrderAction(orderId, action);
+                removeTypingIndicator();
+                
+                let message = result.message || "Action completed successfully.";
+                if (result.refundId) {
+                    message += ` Refund ID: ${result.refundId}`;
+                }
+                if (result.returnId) {
+                    message += ` Return ID: ${result.returnId}`;
+                }
+                if (result.exchangeId) {
+                    message += ` Exchange ID: ${result.exchangeId}`;
+                }
+                if (result.tracking) {
+                    message = `Tracking Info:\nStatus: ${result.tracking.status}\n`;
+                    if (result.tracking.trackingNumber) {
+                        message += `Tracking Number: ${result.tracking.trackingNumber}\n`;
+                    }
+                    if (result.tracking.estimatedDelivery) {
+                        message += `Estimated Delivery: ${new Date(result.tracking.estimatedDelivery).toLocaleDateString()}`;
+                    }
+                }
+                
+                appendBotMessage({ reply: message });
+            } catch (error) {
+                removeTypingIndicator();
+                appendBotMessage({ reply: `Error: ${error.message}. Please try again.` });
+            }
+        };
+
+        // Main send message function
+        window.sendMessage = async function () {
+            const message = input.value.trim();
+            if (!message) return;
+
+            appendUserMessage(message);
+            input.value = "";
+            input.disabled = true;
+            sendBtn.disabled = true;
+            sendBtn.classList.add("loading");
+
+            const typingIndicator = showTypingIndicator();
+
+            try {
+                const response = await sendMessageToBot(message, getContext());
+                removeTypingIndicator();
+                appendBotMessage(response);
+            } catch (error) {
+                removeTypingIndicator();
+                appendBotMessage({ reply: "Sorry, there was an error. Please try again." });
+            } finally {
+                input.disabled = false;
+                sendBtn.disabled = false;
+                sendBtn.classList.remove("loading");
+                input.focus();
+            }
+        };
+
+        // Enter key support
+        input.addEventListener("keypress", (e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Check backend connection on load
+        async function checkBackendConnection() {
+            try {
+                const response = await fetch("http://localhost:8000/api/health", {
+                    method: "GET",
+                    mode: 'cors'
+                });
+                if (response.ok) {
+                    console.log("✓ Backend server is connected");
+                } else {
+                    console.warn("⚠ Backend server responded with error");
+                }
+            } catch (err) {
+                console.error("✗ Backend server connection failed:", err);
+                appendBotMessage({ 
+                    reply: "⚠ Warning: Unable to connect to backend server. Please make sure the backend is running on http://localhost:8000" 
+                });
+            }
+        }
+
+        // Check connection on page load
+        checkBackendConnection();
+
+        // Focus input on load
+        input.focus();
+    </script>
+</body>
+</html>
