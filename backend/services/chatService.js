@@ -1,6 +1,7 @@
 // backend/services/chatService.js
 // Chat service with conversation context handling
 import { Order } from "../models/Order.js";
+import { Product } from "../models/Product.js";
 import { getFAQAnswer } from "./faqService.js";
 import mongoose from "mongoose";
 
@@ -204,8 +205,18 @@ export async function handleChatMessage(message, context = {}) {
     }
   }
 
-  // Handle general queries
+  // Handle general queries & Product Search
   if (convContext.flow === "general" || convContext.expecting === "general_query") {
+    // 1. Try Product Search
+    const productMatch = await searchProducts(message);
+    if (productMatch) {
+       return {
+         reply: productMatch,
+         context: { ...convContext, expecting: "general_query" }
+       };
+    }
+
+    // 2. Try FAQ
     const faqAnswer = getFAQAnswer(message);
     if (faqAnswer) {
       return {
@@ -354,3 +365,46 @@ export function clearContext(sessionId = "default") {
   conversationContexts.delete(sessionId);
 }
 
+/**
+ * Search for products
+ */
+async function searchProducts(query) {
+  const queryLower = query.toLowerCase();
+  
+  // Basic keyword extraction (very simple)
+  // Check if query implies looking for a product
+  const isProductQuery = queryLower.includes("price") || 
+                         queryLower.includes("how much") || 
+                         queryLower.includes("have") || 
+                         queryLower.includes("buy") || 
+                         queryLower.includes("cost") ||
+                         queryLower.includes("show") ||
+                         queryLower.includes("details");
+
+  if (!isProductQuery && !queryLower.includes("smartphone") && !queryLower.includes("headphone") && !queryLower.includes("watch")) {
+      return null;
+  }
+
+  // extract keywords to match against product names
+  // In a real app, use MongoDB text search or Atlas Search
+  const products = await Product.find({
+    $or: [
+      { name: { $regex: query, $options: 'i' } },
+      { category: { $regex: query, $options: 'i' } },
+      { description: { $regex: query, $options: 'i' } }
+    ]
+  }).limit(3);
+
+  if (products.length > 0) {
+    let reply = `I found ${products.length} product(s) matching your query:\n\n`;
+    products.forEach(p => {
+      reply += `📱 **${p.name}**\n`;
+      reply += `   💰 Price: ₹${p.price}\n`;
+      reply += `   📝 ${p.description}\n`;
+      reply += `   ✅ In Stock: ${p.inStock ? 'Yes' : 'No'}\n\n`;
+    });
+    return reply;
+  }
+  
+  return null;
+}

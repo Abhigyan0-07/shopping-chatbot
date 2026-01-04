@@ -173,6 +173,70 @@ const sampleOrders = [
       status: "Exchange",
       note: "Exchange requested for different color variant."
     }]
+  },
+  {
+    orderId: "12352",
+    customerName: "Abhigyan",
+    customerEmail: "abhigyan@example.com",
+    items: [
+      { productName: "Gaming Mouse", quantity: 1, price: 1499 },
+      { productName: "Laptop Stand", quantity: 1, price: 1999 }
+    ],
+    totalAmount: 3498,
+    status: "shipped",
+    shippingAddress: {
+      street: "101 Tech Park",
+      city: "Pune",
+      state: "Maharashtra",
+      zipCode: "411001"
+    },
+    paymentMethod: "UPI",
+    paymentStatus: "paid",
+    orderDate: new Date("2024-02-01"),
+    estimatedDelivery: new Date("2024-02-05"),
+    trackingNumber: "TRACK_GAME_123"
+  },
+  {
+    orderId: "12353",
+    customerName: "Abhigyan",
+    customerEmail: "abhigyan@example.com",
+    items: [
+      { productName: "Smart Watch Ultra", quantity: 1, price: 24999 }
+    ],
+    totalAmount: 24999,
+    status: "Processing",
+    shippingAddress: {
+      street: "101 Tech Park",
+      city: "Pune",
+      state: "Maharashtra",
+      zipCode: "411001"
+    },
+    paymentMethod: "Credit Card",
+    paymentStatus: "paid",
+    orderDate: new Date("2024-02-03"),
+    estimatedDelivery: new Date("2024-02-10"),
+    trackingNumber: null
+  },
+  {
+    orderId: "12354",
+    customerName: "Abhigyan",
+    customerEmail: "abhigyan@example.com",
+    items: [
+      { productName: "Wireless Headphones Pro", quantity: 2, price: 2999 }
+    ],
+    totalAmount: 5998,
+    status: "Delivered",
+    shippingAddress: {
+      street: "101 Tech Park",
+      city: "Pune",
+      state: "Maharashtra",
+      zipCode: "411001"
+    },
+    paymentMethod: "Net Banking",
+    paymentStatus: "paid",
+    orderDate: new Date("2024-01-25"),
+    estimatedDelivery: new Date("2024-01-30"),
+    trackingNumber: "TRACK_AUDIO_999"
   }
 ];
 
